@@ -6,7 +6,9 @@ import (
 	"io"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
-	"encoding/base64"
+	"strings"
+	"path/filepath"
+	"os"
 )
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +44,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 	defer file.Close()
 	mediaType := header.Header.Get("Content-Type")
-	data, err := io.ReadAll(file)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Failed trying to Upload Thumbnail", err)
 		return
@@ -56,9 +57,16 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized!", err)
 		return
 	}
-	
-	datastr := base64.StdEncoding.EncodeToString(data)
-	url := fmt.Sprintf("data:%s;base64,%s",mediaType,datastr)
+	contentAndExtension := strings.Split(mediaType, "/")
+	if len(contentAndExtension) != 2 || contentAndExtension[0] != "image" {
+		respondWithError(w, http.StatusBadRequest, "Thumbnail has to be an image", err)
+		return
+	} 
+	savePath := filepath.Join(cfg.assetsRoot,videoID.String() + "." + contentAndExtension[1])
+	save_file, err := os.Create(savePath)
+	fmt.Println(savePath)
+	io.Copy(save_file,file)
+	url := fmt.Sprintf("http://localhost:%s/assets/%s.%s",cfg.port,videoID.String(),contentAndExtension[1])
 	videoData.ThumbnailURL = &url
 	cfg.db.UpdateVideo(videoData)
 	
