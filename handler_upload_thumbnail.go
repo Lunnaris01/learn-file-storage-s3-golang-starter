@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 	"net/http"
-
+	"io"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
+	"encoding/base64"
 )
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +32,36 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
 
-	// TODO: implement the upload here
+	const maxMemory = 10 << 20
+	r.ParseMultipartForm(maxMemory)
+	// "thumbnail" should match the HTML form input name
+	file, header, err := r.FormFile("thumbnail")
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unable to parse form file", err)
+		return
+	}
+	defer file.Close()
+	mediaType := header.Header.Get("Content-Type")
+	data, err := io.ReadAll(file)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed trying to Upload Thumbnail", err)
+		return
+	}
+	videoData, err := cfg.db.GetVideo(videoID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to fetch Metadata", err)
+		return
+	}
+	if videoData.UserID != userID {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized!", err)
+		return
+	}
+	
+	datastr := base64.StdEncoding.EncodeToString(data)
+	url := fmt.Sprintf("data:%s;base64,%s",mediaType,datastr)
+	videoData.ThumbnailURL = &url
+	cfg.db.UpdateVideo(videoData)
+	
 
-	respondWithJSON(w, http.StatusOK, struct{}{})
+	respondWithJSON(w, http.StatusOK, videoData)
 }
