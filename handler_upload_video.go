@@ -119,11 +119,15 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	}
 
-	url := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s",cfg.s3Bucket,cfg.s3Region,randFilenameStr)
+	url := fmt.Sprintf("%s;%s",cfg.s3Bucket,randFilenameStr)
 	videoData.VideoURL = &url
 	cfg.db.UpdateVideo(videoData)
+	retVideo,err := cfg.dbVideoToSignedVideo(videoData)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to generate Video URL!", err)
+		return
+	}
 
-
-	respondWithJSON(w, http.StatusOK, videoData.VideoURL)
+	respondWithJSON(w, http.StatusOK, retVideo.VideoURL)
 
 }
