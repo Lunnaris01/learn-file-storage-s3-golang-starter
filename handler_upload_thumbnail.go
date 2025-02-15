@@ -9,6 +9,8 @@ import (
 	"strings"
 	"path/filepath"
 	"os"
+	"crypto/rand"
+	"encoding/base64"
 )
 
 func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Request) {
@@ -62,11 +64,13 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "Thumbnail has to be an image", err)
 		return
 	} 
-	savePath := filepath.Join(cfg.assetsRoot,videoID.String() + "." + contentAndExtension[1])
+	randFilename := make([]byte,32)
+	rand.Read(randFilename)
+	randFilenameStr := base64.URLEncoding.EncodeToString(randFilename)
+	savePath := filepath.Join(cfg.assetsRoot,randFilenameStr + "." + contentAndExtension[1])
 	save_file, err := os.Create(savePath)
-	fmt.Println(savePath)
 	io.Copy(save_file,file)
-	url := fmt.Sprintf("http://localhost:%s/assets/%s.%s",cfg.port,videoID.String(),contentAndExtension[1])
+	url := fmt.Sprintf("http://localhost:%s/assets/%s.%s",cfg.port,randFilenameStr ,contentAndExtension[1])
 	videoData.ThumbnailURL = &url
 	cfg.db.UpdateVideo(videoData)
 	
